@@ -1,53 +1,42 @@
-# Dependencies
-node_modules/
-venv/
-.venv/
-env/
-.env/
-
-# Environment variables
+# Environment files
 .env
 .env.local
 .env.*.local
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Node.js workspaces
+**/node_modules/
+frontend/coverage/
+e2e/playwright-report/
+e2e/test-results/
+e2e/playwright/.cache/
+e2e/screenshots/
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
+# Python backend
+backend/.venv/
+backend/venv/
+backend/env/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
 
-# Logs
-logs/
+# .NET backend
+backend-dotnet/**/bin/
+backend-dotnet/**/obj/
+backend-dotnet/**/TestResults/
+backend-dotnet/.vs/
+*.user
+*.rsuser
+*.suo
+
+# Logs and temp files
 *.log
+*.bak
+*.tmp
+*.temp
 
-# IDE
+# Editor settings
 .idea/
 .cursor/
 .vscode/
@@ -55,26 +44,7 @@ logs/
 *.swo
 *~
 
-# OS
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Build artifacts
-dist/
-build/
-*.min.js.map
-
-# Playwright
-e2e/test-results/
-e2e/playwright-report/
-e2e/playwright/.cache/
-
-# Misc
-*.bak
-*.tmp
-*.temp
+ehthumbs.db
