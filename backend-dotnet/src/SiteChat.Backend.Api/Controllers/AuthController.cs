@@ -11,10 +11,10 @@ namespace SiteChat.Backend.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IAuthService authService, IMongoSiteChatRepository repository) : SiteChatControllerBase
+public sealed class AuthController(IAuthService authService, IUserRepository repository) : SiteChatControllerBase
 {
     private readonly IAuthService _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     /// <summary>Authenticates a user.</summary>
     [HttpPost("login")]

@@ -12,11 +12,11 @@ namespace SiteChat.Backend.Api.Controllers;
 [Route("api/chat")]
 public sealed class ChatController(
     IRagService ragService,
-    IMongoSiteChatRepository repository,
+    IUserRepository repository,
     IConversationAccessService conversationAccessService) : SiteChatControllerBase
 {
     private readonly IRagService _ragService = ragService ?? throw new ArgumentNullException(nameof(ragService));
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     private readonly IConversationAccessService _conversationAccessService = conversationAccessService ?? throw new ArgumentNullException(nameof(conversationAccessService));
 
     /// <summary>Generates a chat response.</summary>

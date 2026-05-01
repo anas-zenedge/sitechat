@@ -16,7 +16,7 @@ public abstract class SiteChatControllerBase : ControllerBase
     /// <param name="repository">The user repository.</param>
     /// <param name="cancellationToken">A token that cancels the operation.</param>
     /// <returns>The current user.</returns>
-    protected async Task<MongoUser?> GetCurrentUserAsync(IMongoSiteChatRepository repository, CancellationToken cancellationToken)
+    protected async Task<MongoUser?> GetCurrentUserAsync(IUserRepository repository, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repository);
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

@@ -20,10 +20,11 @@ public sealed class AuthServiceTests
     public async Task UpdateUserRoleAsync_InvalidRole_ThrowsInvalidOperationException()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
+        var repository = new Mock<IUserRepository>(MockBehavior.Strict);
+        var siteRepository = new Mock<ISiteRepository>(MockBehavior.Strict);
         var passwordPolicy = new Mock<IPasswordPolicy>(MockBehavior.Strict);
         var tokenService = new Mock<ITokenService>(MockBehavior.Strict);
-        var service = new AuthService(repository.Object, passwordPolicy.Object, tokenService.Object, Options.Create(new SiteChatOptions()));
+        var service = new AuthService(repository.Object, siteRepository.Object, passwordPolicy.Object, tokenService.Object, Options.Create(new SiteChatOptions()));
 
         // Act
         var act = async () => await service.UpdateUserRoleAsync("user-1", "super-admin", CancellationToken.None);
@@ -40,10 +41,11 @@ public sealed class AuthServiceTests
     public async Task UpdateUserRoleAsync_ValidRole_DelegatesToRepository()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
+        var repository = new Mock<IUserRepository>(MockBehavior.Strict);
+        var siteRepository = new Mock<ISiteRepository>(MockBehavior.Strict);
         var passwordPolicy = new Mock<IPasswordPolicy>(MockBehavior.Strict);
         var tokenService = new Mock<ITokenService>(MockBehavior.Strict);
-        var service = new AuthService(repository.Object, passwordPolicy.Object, tokenService.Object, Options.Create(new SiteChatOptions()));
+        var service = new AuthService(repository.Object, siteRepository.Object, passwordPolicy.Object, tokenService.Object, Options.Create(new SiteChatOptions()));
 
         repository.Setup(item => item.UpdateUserRoleAsync("user-1", "agent", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

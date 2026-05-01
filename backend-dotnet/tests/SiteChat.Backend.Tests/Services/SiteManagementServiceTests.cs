@@ -19,7 +19,7 @@ public sealed class SiteManagementServiceTests
     public async Task CreateSiteAsync_WithOwner_AssignsPublicOwnerId()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
+        var repository = new Mock<ISiteRepository>(MockBehavior.Strict);
         var service = new SiteManagementService(repository.Object);
         var owner = new MongoUser
         {
@@ -53,7 +53,7 @@ public sealed class SiteManagementServiceTests
     public async Task UpdateConfigAsync_WithExistingSite_MergesAndPersistsConfiguration()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
+        var repository = new Mock<ISiteRepository>(MockBehavior.Strict);
         var service = new SiteManagementService(repository.Object);
         var site = new MongoSite
         {

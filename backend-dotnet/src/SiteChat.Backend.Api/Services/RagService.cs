@@ -243,14 +243,18 @@ public sealed class OpenRouterClient(HttpClient httpClient, IOptions<SiteChatOpt
 /// Implements a safe, extensible RAG service with OpenRouter-backed retrieval behavior.
 /// </summary>
 public sealed class RagService(
-    IMongoSiteChatRepository repository,
+    IConversationRepository conversationRepository,
+    ISiteRepository siteRepository,
+    IPageRepository pageRepository,
     IAiProviderClient aiProviderClient,
     IOptions<SiteChatOptions> options,
     ILogger<RagService> logger) : IRagService
 {
     private const string InsufficientContextResponse = "I don't have enough indexed context to answer that confidently yet. Please add or crawl site content and try again.";
 
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IConversationRepository _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
+    private readonly IPageRepository _pageRepository = pageRepository ?? throw new ArgumentNullException(nameof(pageRepository));
     private readonly IAiProviderClient _aiProviderClient = aiProviderClient ?? throw new ArgumentNullException(nameof(aiProviderClient));
     private readonly SiteChatOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly ILogger<RagService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -260,10 +264,10 @@ public sealed class RagService(
     {
         ArgumentNullException.ThrowIfNull(request);
         var message = SanitizePrompt(request.Message);
-        await _repository.SaveMessageAsync(request.SessionId, "user", message, request.SiteId, null, cancellationToken).ConfigureAwait(false);
+        await _conversationRepository.SaveMessageAsync(request.SessionId, "user", message, request.SiteId, null, cancellationToken).ConfigureAwait(false);
 
         var site = !string.IsNullOrWhiteSpace(request.SiteId)
-            ? await _repository.GetSiteAsync(request.SiteId, cancellationToken).ConfigureAwait(false)
+            ? await _siteRepository.GetSiteAsync(request.SiteId, cancellationToken).ConfigureAwait(false)
             : null;
         var siteConfig = SiteConfigDocumentSerializer.Read(site?.Config).Normalize();
 
@@ -316,7 +320,7 @@ public sealed class RagService(
             request.SessionId,
             totalTokens);
 
-        await _repository.SaveMessageAsync(request.SessionId, "assistant", response.Answer, request.SiteId, response.Sources, cancellationToken).ConfigureAwait(false);
+        await _conversationRepository.SaveMessageAsync(request.SessionId, "assistant", response.Answer, request.SiteId, response.Sources, cancellationToken).ConfigureAwait(false);
         return response;
     }
 
@@ -346,7 +350,7 @@ public sealed class RagService(
         var queryEmbedding = await _aiProviderClient.CreateEmbeddingAsync(
             new EmbeddingRequest(message, "search_query", userId),
             cancellationToken).ConfigureAwait(false);
-        var candidates = await _repository.GetPagesForRetrievalAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var candidates = await _pageRepository.GetPagesForRetrievalAsync(siteId, cancellationToken).ConfigureAwait(false);
 
         return candidates
             .Select(page => new

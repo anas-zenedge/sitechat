@@ -66,10 +66,14 @@ public interface IConversationAccessService
 /// Implements conversation access rules using site ownership and assignment rules.
 /// </summary>
 public sealed class ConversationAccessService(
-    IMongoSiteChatRepository repository,
+    IConversationRepository conversationRepository,
+    ISiteRepository siteRepository,
+    ISystemRepository systemRepository,
     ISiteAccessService siteAccessService) : IConversationAccessService
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IConversationRepository _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
+    private readonly ISystemRepository _systemRepository = systemRepository ?? throw new ArgumentNullException(nameof(systemRepository));
     private readonly ISiteAccessService _siteAccessService = siteAccessService ?? throw new ArgumentNullException(nameof(siteAccessService));
 
     /// <inheritdoc />
@@ -81,7 +85,7 @@ public sealed class ConversationAccessService(
             return true;
         }
 
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         return site is not null && _siteAccessService.CanViewSite(user, site);
     }
 
@@ -89,7 +93,7 @@ public sealed class ConversationAccessService(
     public async Task<MongoConversation?> GetConversationAsync(MongoUser user, string sessionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(user);
-        var conversation = await _repository.GetConversationAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var conversation = await _conversationRepository.GetConversationAsync(sessionId, cancellationToken).ConfigureAwait(false);
         if (conversation is null)
         {
             return null;
@@ -105,7 +109,7 @@ public sealed class ConversationAccessService(
             return null;
         }
 
-        var site = await _repository.GetSiteAsync(conversation.SiteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(conversation.SiteId, cancellationToken).ConfigureAwait(false);
         return site is not null && _siteAccessService.CanViewSite(user, site) ? conversation : null;
     }
 
@@ -122,20 +126,20 @@ public sealed class ConversationAccessService(
 
         if (user.Role == UserRoles.Admin)
         {
-            return await _repository.ListConversationsAsync(siteId, search, page, limit, cancellationToken).ConfigureAwait(false);
+            return await _conversationRepository.ListConversationsAsync(siteId, search, page, limit, cancellationToken).ConfigureAwait(false);
         }
 
         if (!string.IsNullOrWhiteSpace(siteId))
         {
             return await CanAccessSiteAsync(user, siteId, cancellationToken).ConfigureAwait(false)
-                ? await _repository.ListConversationsAsync(siteId, search, page, limit, cancellationToken).ConfigureAwait(false)
+                ? await _conversationRepository.ListConversationsAsync(siteId, search, page, limit, cancellationToken).ConfigureAwait(false)
                 : (Array.Empty<MongoConversation>(), 0L);
         }
 
         var accessibleSiteIds = await GetAccessibleSiteIdsAsync(user, cancellationToken).ConfigureAwait(false);
         return accessibleSiteIds.Count == 0
             ? (Array.Empty<MongoConversation>(), 0L)
-            : await _repository.ListConversationsForSitesAsync(accessibleSiteIds, search, page, limit, cancellationToken).ConfigureAwait(false);
+            : await _conversationRepository.ListConversationsForSitesAsync(accessibleSiteIds, search, page, limit, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -155,7 +159,7 @@ public sealed class ConversationAccessService(
 
         return accessibleSessionIds.Count == 0
             ? 0
-            : await _repository.DeleteConversationsAsync(accessibleSessionIds, cancellationToken).ConfigureAwait(false);
+            : await _conversationRepository.DeleteConversationsAsync(accessibleSessionIds, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -164,19 +168,19 @@ public sealed class ConversationAccessService(
         ArgumentNullException.ThrowIfNull(user);
         if (user.Role == UserRoles.Admin)
         {
-            return await _repository.GetSystemStatsAsync(cancellationToken).ConfigureAwait(false);
+            return await _systemRepository.GetSystemStatsAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var accessibleSiteIds = await GetAccessibleSiteIdsAsync(user, cancellationToken).ConfigureAwait(false);
-        return await _repository.GetSystemStatsForSitesAsync(accessibleSiteIds, cancellationToken).ConfigureAwait(false);
+        return await _systemRepository.GetSystemStatsForSitesAsync(accessibleSiteIds, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<string>> GetAccessibleSiteIdsAsync(MongoUser user, CancellationToken cancellationToken)
     {
         IReadOnlyList<MongoSite> sites = user.Role switch
         {
-            UserRoles.User => await _repository.ListSitesAsync(MongoIdentifiers.GetPublicId(user), null, cancellationToken).ConfigureAwait(false),
-            UserRoles.Agent => await _repository.ListSitesAsync(null, user.AssignedSiteIds, cancellationToken).ConfigureAwait(false),
+            UserRoles.User => await _siteRepository.ListSitesAsync(MongoIdentifiers.GetPublicId(user), null, cancellationToken).ConfigureAwait(false),
+            UserRoles.Agent => await _siteRepository.ListSitesAsync(null, user.AssignedSiteIds, cancellationToken).ConfigureAwait(false),
             _ => Array.Empty<MongoSite>()
         };
 

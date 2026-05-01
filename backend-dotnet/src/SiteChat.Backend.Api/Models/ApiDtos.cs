@@ -59,6 +59,11 @@ public sealed record HealthCheckResponse(string Status, string Mongodb, string V
 public sealed record SystemStats(int TotalPages, int TotalChunks, int TotalConversations, int TotalMessages, DateTime? LastCrawl);
 
 /// <summary>
+/// Represents an indexed page summary returned by management endpoints.
+/// </summary>
+public sealed record IndexedPageSummary(string Url, string Title, int ChunkCount, DateTime? LastCrawled, string Status);
+
+/// <summary>
 /// Represents a user's login credentials.
 /// </summary>
 public sealed record UserLogin(string Email, string Password);

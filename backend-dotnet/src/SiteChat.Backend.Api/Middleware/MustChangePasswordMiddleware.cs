@@ -17,7 +17,7 @@ public sealed class MustChangePasswordMiddleware(RequestDelegate next)
     /// <param name="context">The HTTP context.</param>
     /// <param name="repository">The user repository.</param>
     /// <returns>A task that completes when request processing finishes.</returns>
-    public async Task InvokeAsync(HttpContext context, IMongoSiteChatRepository repository)
+    public async Task InvokeAsync(HttpContext context, IUserRepository repository)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(repository);

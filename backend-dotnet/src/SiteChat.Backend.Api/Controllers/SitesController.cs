@@ -12,11 +12,13 @@ namespace SiteChat.Backend.Api.Controllers;
 [ApiController]
 [Route("api/sites")]
 public sealed class SitesController(
-    IMongoSiteChatRepository repository,
+    IUserRepository userRepository,
+    ISiteRepository siteRepository,
     ISiteAccessService accessService,
     ISiteManagementService siteManagementService) : SiteChatControllerBase
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
     private readonly ISiteAccessService _accessService = accessService ?? throw new ArgumentNullException(nameof(accessService));
     private readonly ISiteManagementService _siteManagementService = siteManagementService ?? throw new ArgumentNullException(nameof(siteManagementService));
 
@@ -25,7 +27,7 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<IReadOnlyList<object>>> ListAsync(CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(user) is { } missing)
         {
             return missing;
@@ -33,7 +35,7 @@ public sealed class SitesController(
 
         var ownerId = user!.Role == UserRoles.User ? MongoIdentifiers.GetPublicId(user) : null;
         var siteIds = user.Role == UserRoles.Agent ? user.AssignedSiteIds : null;
-        var sites = await _repository.ListSitesAsync(ownerId, siteIds, cancellationToken).ConfigureAwait(false);
+        var sites = await _siteRepository.ListSitesAsync(ownerId, siteIds, cancellationToken).ConfigureAwait(false);
         return Ok(sites.Select(ToSiteListItem).ToList());
     }
 
@@ -42,13 +44,13 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<object>> GetAsync(string siteId, CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(user) is { } missing)
         {
             return missing;
         }
 
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return NotFound(new { detail = "Site not found" });
@@ -62,13 +64,13 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<ApiMessageResponse>> DeleteAsync(string siteId, CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(user) is { } missing)
         {
             return missing;
         }
 
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return NotFound(new { detail = "Site not found" });
@@ -79,7 +81,7 @@ public sealed class SitesController(
             return Forbid();
         }
 
-        await _repository.DeleteSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        await _siteRepository.DeleteSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         return Ok(new ApiMessageResponse($"Site {siteId} deleted successfully"));
     }
 
@@ -97,8 +99,8 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<SiteConfig>> UpdateConfigAsync(string siteId, [FromBody] SiteConfigUpdate update, CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return NotFound(new { detail = "Site not found" });
@@ -118,13 +120,13 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<SiteConfig>> ResetConfigAsync(string siteId, CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(user) is { } missing)
         {
             return missing;
         }
 
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return NotFound(new { detail = "Site not found" });
@@ -144,13 +146,13 @@ public sealed class SitesController(
     [Authorize]
     public async Task<ActionResult<SiteQuickPromptsConfig>> UpdateQuickPromptsAsync(string siteId, [FromBody] SiteQuickPromptsConfig request, CancellationToken cancellationToken)
     {
-        var user = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var user = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(user) is { } missing)
         {
             return missing;
         }
 
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return NotFound(new { detail = "Site not found" });

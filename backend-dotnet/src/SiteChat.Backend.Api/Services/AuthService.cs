@@ -1,4 +1,3 @@
-using MongoDB.Driver;
 using SiteChat.Backend.Api.Configuration;
 using SiteChat.Backend.Api.Models;
 using SiteChat.Backend.Api.Security;
@@ -38,12 +37,14 @@ public interface IAuthService
 /// Implements SiteChat account and authentication behavior.
 /// </summary>
 public sealed class AuthService(
-    IMongoSiteChatRepository repository,
+    IUserRepository userRepository,
+    ISiteRepository siteRepository,
     IPasswordPolicy passwordPolicy,
     ITokenService tokenService,
     Microsoft.Extensions.Options.IOptions<SiteChatOptions> options) : IAuthService
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
     private readonly IPasswordPolicy _passwordPolicy = passwordPolicy ?? throw new ArgumentNullException(nameof(passwordPolicy));
     private readonly ITokenService _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
     private readonly SiteChatOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
@@ -52,7 +53,7 @@ public sealed class AuthService(
     public async Task<TokenResponse?> LoginAsync(UserLogin login, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(login);
-        var user = await _repository.GetUserByEmailAsync(login.Email, cancellationToken).ConfigureAwait(false);
+        var user = await _userRepository.GetUserByEmailAsync(login.Email, cancellationToken).ConfigureAwait(false);
         if (user is null || !BCrypt.Net.BCrypt.Verify(login.Password, user.PasswordHash))
         {
             return null;
@@ -67,12 +68,12 @@ public sealed class AuthService(
         ArgumentNullException.ThrowIfNull(request);
         ValidatePasswordOrThrow(request.Password);
 
-        if (await _repository.GetUserByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false) is not null)
+        if (await _userRepository.GetUserByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false) is not null)
         {
             return null;
         }
 
-        var created = await _repository.CreateUserAsync(new MongoUser
+        var created = await _userRepository.CreateUserAsync(new MongoUser
         {
             Email = request.Email,
             Name = SanitizeName(request.Name),
@@ -91,7 +92,7 @@ public sealed class AuthService(
         ArgumentNullException.ThrowIfNull(request);
         ValidatePasswordOrThrow(request.Password);
 
-        if (await _repository.GetUserByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false) is not null)
+        if (await _userRepository.GetUserByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false) is not null)
         {
             return null;
         }
@@ -102,7 +103,7 @@ public sealed class AuthService(
             throw new InvalidOperationException("One or more sites are invalid or not owned by you");
         }
 
-        var created = await _repository.CreateUserAsync(new MongoUser
+        var created = await _userRepository.CreateUserAsync(new MongoUser
         {
             Email = request.Email,
             Name = SanitizeName(request.Name),
@@ -122,10 +123,12 @@ public sealed class AuthService(
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(request);
 
-        var updates = new List<UpdateDefinition<MongoUser>>();
+        string? updatedName = null;
+        string? passwordHash = null;
+        bool? mustChangePassword = null;
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.Name, SanitizeName(request.Name)));
+            updatedName = SanitizeName(request.Name);
         }
 
         if (!string.IsNullOrEmpty(request.NewPassword))
@@ -144,54 +147,58 @@ public sealed class AuthService(
                 }
             }
 
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.PasswordHash, BCrypt.Net.BCrypt.HashPassword(request.NewPassword)));
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.MustChangePassword, false));
+            passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            mustChangePassword = false;
         }
 
-        if (updates.Count > 0)
+        if (updatedName is not null || passwordHash is not null || mustChangePassword.HasValue)
         {
-            await _repository.UpdateUserAsync(MongoIdentifiers.GetPublicId(user), Builders<MongoUser>.Update.Combine(updates), cancellationToken).ConfigureAwait(false);
+            await _userRepository.UpdateUserAsync(
+                MongoIdentifiers.GetPublicId(user),
+                new UserUpdate(updatedName, passwordHash, mustChangePassword),
+                cancellationToken).ConfigureAwait(false);
         }
 
-        var updated = await _repository.GetUserByIdAsync(MongoIdentifiers.GetPublicId(user), cancellationToken).ConfigureAwait(false);
+        var updated = await _userRepository.GetUserByIdAsync(MongoIdentifiers.GetPublicId(user), cancellationToken).ConfigureAwait(false);
         return updated is null ? null : ToResponse(updated);
     }
 
     /// <inheritdoc />
     public async Task<UserResponse?> UpdateSiteOwnerAsync(string userId, SiteOwnerUpdate request, CancellationToken cancellationToken)
     {
-        var user = await _repository.GetUserByIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        var user = await _userRepository.GetUserByIdAsync(userId, cancellationToken).ConfigureAwait(false);
         if (user is null || user.Role != UserRoles.User)
         {
             return null;
         }
 
-        var updates = new List<UpdateDefinition<MongoUser>>();
+        string? updatedName = null;
+        string? passwordHash = null;
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.Name, SanitizeName(request.Name)));
+            updatedName = SanitizeName(request.Name);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             ValidatePasswordOrThrow(request.Password);
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.PasswordHash, BCrypt.Net.BCrypt.HashPassword(request.Password)));
+            passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         }
 
-        if (updates.Count == 0)
+        if (updatedName is null && passwordHash is null)
         {
             return ToResponse(user);
         }
 
-        await _repository.UpdateUserAsync(userId, Builders<MongoUser>.Update.Combine(updates), cancellationToken).ConfigureAwait(false);
-        var updated = await _repository.GetUserByIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        await _userRepository.UpdateUserAsync(userId, new UserUpdate(updatedName, passwordHash), cancellationToken).ConfigureAwait(false);
+        var updated = await _userRepository.GetUserByIdAsync(userId, cancellationToken).ConfigureAwait(false);
         return updated is null ? null : ToResponse(updated);
     }
 
     /// <inheritdoc />
     public async Task<UserResponse?> UpdateAgentAsync(MongoUser caller, string agentId, AgentUpdate request, CancellationToken cancellationToken)
     {
-        var agent = await _repository.GetUserByIdAsync(agentId, cancellationToken).ConfigureAwait(false);
+        var agent = await _userRepository.GetUserByIdAsync(agentId, cancellationToken).ConfigureAwait(false);
         if (agent is null || agent.Role != UserRoles.Agent)
         {
             return null;
@@ -202,10 +209,12 @@ public sealed class AuthService(
             return null;
         }
 
-        var updates = new List<UpdateDefinition<MongoUser>>();
+        string? updatedName = null;
+        string? passwordHash = null;
+        IReadOnlyList<string>? assignedSiteIds = null;
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.Name, SanitizeName(request.Name)));
+            updatedName = SanitizeName(request.Name);
         }
 
         if (request.AssignedSiteIds is not null)
@@ -215,35 +224,35 @@ public sealed class AuthService(
                 throw new InvalidOperationException("One or more sites are invalid or not owned by you");
             }
 
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.AssignedSiteIds, request.AssignedSiteIds.ToList()));
+            assignedSiteIds = request.AssignedSiteIds.ToList();
         }
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             ValidatePasswordOrThrow(request.Password);
-            updates.Add(Builders<MongoUser>.Update.Set(account => account.PasswordHash, BCrypt.Net.BCrypt.HashPassword(request.Password)));
+            passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         }
 
-        if (updates.Count > 0)
+        if (updatedName is not null || passwordHash is not null || assignedSiteIds is not null)
         {
-            await _repository.UpdateUserAsync(agentId, Builders<MongoUser>.Update.Combine(updates), cancellationToken).ConfigureAwait(false);
+            await _userRepository.UpdateUserAsync(agentId, new UserUpdate(updatedName, passwordHash, AssignedSiteIds: assignedSiteIds), cancellationToken).ConfigureAwait(false);
         }
 
-        var updated = await _repository.GetUserByIdAsync(agentId, cancellationToken).ConfigureAwait(false);
+        var updated = await _userRepository.GetUserByIdAsync(agentId, cancellationToken).ConfigureAwait(false);
         return updated is null ? null : ToResponse(updated);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<UserResponse>> ListUsersAsync(CancellationToken cancellationToken)
     {
-        var users = await _repository.GetAllUsersAsync(cancellationToken).ConfigureAwait(false);
+        var users = await _userRepository.GetAllUsersAsync(cancellationToken).ConfigureAwait(false);
         return users.Select(ToResponse).ToList();
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<UserResponse>> ListAgentsAsync(MongoUser caller, CancellationToken cancellationToken)
     {
-        var users = await _repository.GetAllUsersAsync(cancellationToken).ConfigureAwait(false);
+        var users = await _userRepository.GetAllUsersAsync(cancellationToken).ConfigureAwait(false);
         var agents = users.Where(user => user.Role == UserRoles.Agent);
         if (caller.Role != UserRoles.Admin)
         {
@@ -263,17 +272,17 @@ public sealed class AuthService(
             throw new InvalidOperationException("Role must be one of: admin, user, agent");
         }
 
-        return await _repository.UpdateUserRoleAsync(userId, normalizedRole, cancellationToken).ConfigureAwait(false);
+        return await _userRepository.UpdateUserRoleAsync(userId, normalizedRole, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken) =>
-        _repository.DeleteUserAsync(userId, cancellationToken);
+        _userRepository.DeleteUserAsync(userId, cancellationToken);
 
     /// <inheritdoc />
     public async Task EnsureAdminExistsAsync(CancellationToken cancellationToken)
     {
-        if (await _repository.GetUserByRoleAsync(UserRoles.Admin, cancellationToken).ConfigureAwait(false) is not null)
+        if (await _userRepository.GetUserByRoleAsync(UserRoles.Admin, cancellationToken).ConfigureAwait(false) is not null)
         {
             return;
         }
@@ -286,7 +295,7 @@ public sealed class AuthService(
         }
 
         ValidatePasswordOrThrow(configuredPassword);
-        await _repository.CreateUserAsync(new MongoUser
+        await _userRepository.CreateUserAsync(new MongoUser
         {
             Email = configuredEmail,
             Name = "Administrator",
@@ -324,7 +333,7 @@ public sealed class AuthService(
         var callerId = MongoIdentifiers.GetPublicId(caller);
         foreach (var siteId in siteIds)
         {
-            var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+            var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
             if (site?.UserId != callerId)
             {
                 return false;

@@ -54,9 +54,9 @@ public interface ISiteManagementService
 /// <summary>
 /// Implements site provisioning and configuration persistence behavior.
 /// </summary>
-public sealed class SiteManagementService(IMongoSiteChatRepository repository) : ISiteManagementService
+public sealed class SiteManagementService(ISiteRepository siteRepository) : ISiteManagementService
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
 
     /// <inheritdoc />
     public Task<MongoSite> CreateSiteAsync(MongoUser owner, SetupRequest request, CancellationToken cancellationToken)
@@ -64,7 +64,7 @@ public sealed class SiteManagementService(IMongoSiteChatRepository repository) :
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(request);
 
-        return _repository.CreateSiteAsync(new MongoSite
+        return _siteRepository.CreateSiteAsync(new MongoSite
         {
             UserId = MongoIdentifiers.GetPublicId(owner),
             Url = request.Url,
@@ -76,7 +76,7 @@ public sealed class SiteManagementService(IMongoSiteChatRepository repository) :
     /// <inheritdoc />
     public async Task<SiteConfig?> GetConfigAsync(string siteId, CancellationToken cancellationToken)
     {
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         return site is null ? null : ReadConfig(site).Normalize();
     }
 
@@ -84,7 +84,7 @@ public sealed class SiteManagementService(IMongoSiteChatRepository repository) :
     public async Task<SiteConfig?> UpdateConfigAsync(string siteId, SiteConfigUpdate update, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(update);
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return null;
@@ -100,21 +100,21 @@ public sealed class SiteManagementService(IMongoSiteChatRepository repository) :
             QuickPrompts = update.QuickPrompts ?? current.QuickPrompts
         };
 
-        await _repository.SaveSiteConfigAsync(siteId, merged, cancellationToken).ConfigureAwait(false);
+        await _siteRepository.SaveSiteConfigAsync(siteId, merged, cancellationToken).ConfigureAwait(false);
         return merged.Normalize();
     }
 
     /// <inheritdoc />
     public async Task<SiteConfig?> ResetConfigAsync(string siteId, CancellationToken cancellationToken)
     {
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return null;
         }
 
         var defaultConfig = new SiteConfig().Normalize();
-        await _repository.SaveSiteConfigAsync(siteId, defaultConfig, cancellationToken).ConfigureAwait(false);
+        await _siteRepository.SaveSiteConfigAsync(siteId, defaultConfig, cancellationToken).ConfigureAwait(false);
         return defaultConfig;
     }
 
@@ -122,14 +122,14 @@ public sealed class SiteManagementService(IMongoSiteChatRepository repository) :
     public async Task<SiteQuickPromptsConfig?> UpdateQuickPromptsAsync(string siteId, SiteQuickPromptsConfig quickPrompts, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(quickPrompts);
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         if (site is null)
         {
             return null;
         }
 
         var config = ReadConfig(site).Normalize() with { QuickPrompts = quickPrompts };
-        await _repository.SaveSiteConfigAsync(siteId, config, cancellationToken).ConfigureAwait(false);
+        await _siteRepository.SaveSiteConfigAsync(siteId, config, cancellationToken).ConfigureAwait(false);
         return quickPrompts;
     }
 

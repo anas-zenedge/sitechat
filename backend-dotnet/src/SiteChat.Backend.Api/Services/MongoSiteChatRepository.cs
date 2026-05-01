@@ -8,88 +8,17 @@ using SiteChat.Backend.Api.Models;
 namespace SiteChat.Backend.Api.Services;
 
 /// <summary>
-/// Defines MongoDB operations used by the ASP.NET Core API.
-/// </summary>
-public interface IMongoSiteChatRepository
-{
-    /// <summary>Ensures required MongoDB indexes exist.</summary>
-    Task EnsureIndexesAsync(CancellationToken cancellationToken);
-    /// <summary>Checks whether MongoDB is reachable.</summary>
-    Task<bool> IsHealthyAsync(CancellationToken cancellationToken);
-    /// <summary>Gets a user by email.</summary>
-    Task<MongoUser?> GetUserByEmailAsync(string email, CancellationToken cancellationToken);
-    /// <summary>Gets a user by public or Mongo object identifier.</summary>
-    Task<MongoUser?> GetUserByIdAsync(string userId, CancellationToken cancellationToken);
-    /// <summary>Gets a user by role.</summary>
-    Task<MongoUser?> GetUserByRoleAsync(string role, CancellationToken cancellationToken);
-    /// <summary>Lists all users.</summary>
-    Task<IReadOnlyList<MongoUser>> GetAllUsersAsync(CancellationToken cancellationToken);
-    /// <summary>Creates a user.</summary>
-    Task<MongoUser> CreateUserAsync(MongoUser user, CancellationToken cancellationToken);
-    /// <summary>Updates a user by identifier.</summary>
-    Task<bool> UpdateUserAsync(string userId, UpdateDefinition<MongoUser> update, CancellationToken cancellationToken);
-    /// <summary>Updates a user's role by identifier.</summary>
-    Task<bool> UpdateUserRoleAsync(string userId, string role, CancellationToken cancellationToken);
-    /// <summary>Deletes a user by identifier.</summary>
-    Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken);
-    /// <summary>Gets a site.</summary>
-    Task<MongoSite?> GetSiteAsync(string siteId, CancellationToken cancellationToken);
-    /// <summary>Creates a site.</summary>
-    Task<MongoSite> CreateSiteAsync(MongoSite site, CancellationToken cancellationToken);
-    /// <summary>Lists sites visible by optional owner.</summary>
-    Task<IReadOnlyList<MongoSite>> ListSitesAsync(string? userId, IReadOnlyList<string>? siteIds, CancellationToken cancellationToken);
-    /// <summary>Updates a site document.</summary>
-    Task<bool> UpdateSiteAsync(string siteId, UpdateDefinition<MongoSite> update, CancellationToken cancellationToken);
-    /// <summary>Saves a site's typed configuration.</summary>
-    Task<bool> SaveSiteConfigAsync(string siteId, SiteConfig config, CancellationToken cancellationToken);
-    /// <summary>Deletes a site.</summary>
-    Task<bool> DeleteSiteAsync(string siteId, CancellationToken cancellationToken);
-    /// <summary>Saves a chat message.</summary>
-    Task SaveMessageAsync(string sessionId, string role, string content, string? siteId, IReadOnlyList<SourceDocument>? sources, CancellationToken cancellationToken);
-    /// <summary>Gets a conversation by session identifier.</summary>
-    Task<MongoConversation?> GetConversationAsync(string sessionId, CancellationToken cancellationToken);
-    /// <summary>Lists conversations.</summary>
-    Task<(IReadOnlyList<MongoConversation> Items, long Total)> ListConversationsAsync(string? siteId, string? search, int page, int limit, CancellationToken cancellationToken);
-    /// <summary>Lists conversations for a set of site identifiers.</summary>
-    Task<(IReadOnlyList<MongoConversation> Items, long Total)> ListConversationsForSitesAsync(IReadOnlyList<string> siteIds, string? search, int page, int limit, CancellationToken cancellationToken);
-    /// <summary>Deletes conversations by session identifier.</summary>
-    Task<long> DeleteConversationsAsync(IReadOnlyList<string> sessionIds, CancellationToken cancellationToken);
-    /// <summary>Creates a crawl job.</summary>
-    Task<MongoCrawlJob> CreateCrawlJobAsync(string targetUrl, CancellationToken cancellationToken);
-    /// <summary>Gets a crawl job by identifier.</summary>
-    Task<MongoCrawlJob?> GetCrawlJobAsync(string jobId, CancellationToken cancellationToken);
-    /// <summary>Gets the latest crawl job.</summary>
-    Task<MongoCrawlJob?> GetLatestCrawlJobAsync(CancellationToken cancellationToken);
-    /// <summary>Updates a crawl job.</summary>
-    Task UpdateCrawlJobAsync(string jobId, string status, int pagesCrawled, int pagesIndexed, string? error, CancellationToken cancellationToken);
-    /// <summary>Saves a crawled page.</summary>
-    Task SavePageAsync(string url, string title, string content, int chunkCount, string? siteId, IReadOnlyList<double>? embedding, CancellationToken cancellationToken);
-    /// <summary>Gets indexed pages that are available for retrieval.</summary>
-    Task<IReadOnlyList<IndexedPage>> GetPagesForRetrievalAsync(string? siteId, CancellationToken cancellationToken);
-    /// <summary>Gets aggregate system stats.</summary>
-    Task<SystemStats> GetSystemStatsAsync(CancellationToken cancellationToken);
-    /// <summary>Gets aggregate system stats for a set of sites.</summary>
-    Task<SystemStats> GetSystemStatsForSitesAsync(IReadOnlyList<string> siteIds, CancellationToken cancellationToken);
-    /// <summary>Lists indexed pages.</summary>
-    Task<IReadOnlyList<BsonDocument>> ListPagesAsync(CancellationToken cancellationToken);
-    /// <summary>Deletes an indexed page by URL.</summary>
-    Task<bool> DeletePageAsync(string url, CancellationToken cancellationToken);
-    /// <summary>Clears operational platform data.</summary>
-    Task ClearOperationalDataAsync(CancellationToken cancellationToken);
-    /// <summary>Gets a platform white-label config as raw document.</summary>
-    Task<BsonDocument?> GetPlatformWhiteLabelAsync(CancellationToken cancellationToken);
-    /// <summary>Updates a platform white-label config.</summary>
-    Task<BsonDocument> UpdatePlatformWhiteLabelAsync(BsonDocument config, CancellationToken cancellationToken);
-    /// <summary>Gets a typed platform white-label config.</summary>
-    Task<PlatformWhiteLabelConfig?> GetPlatformWhiteLabelConfigAsync(CancellationToken cancellationToken);
-    /// <summary>Updates a typed platform white-label config.</summary>
-    Task<PlatformWhiteLabelConfig> UpdatePlatformWhiteLabelConfigAsync(PlatformWhiteLabelConfig config, CancellationToken cancellationToken);
-}
-
-/// <summary>
 /// Implements the repository and provider pattern for the existing SiteChat MongoDB schema.
 /// </summary>
-public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, ILogger<MongoSiteChatRepository> logger) : IMongoSiteChatRepository
+public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, ILogger<MongoSiteChatRepository> logger) :
+    IMongoInfrastructureRepository,
+    IUserRepository,
+    ISiteRepository,
+    IConversationRepository,
+    ICrawlJobRepository,
+    IPageRepository,
+    ISystemRepository,
+    IPlatformConfigurationRepository
 {
     private readonly SiteChatOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly ILogger<MongoSiteChatRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -179,16 +108,39 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     }
 
     /// <inheritdoc />
-    public async Task<bool> UpdateUserAsync(string userId, UpdateDefinition<MongoUser> update, CancellationToken cancellationToken)
+    public async Task<bool> UpdateUserAsync(string userId, UserUpdate update, CancellationToken cancellationToken)
     {
-        update = Builders<MongoUser>.Update.Combine(update, Builders<MongoUser>.Update.Set(user => user.UpdatedAt, DateTime.UtcNow));
-        var result = await Users.UpdateOneAsync(UserIdFilter(userId), update, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return result.ModifiedCount > 0;
+        ArgumentNullException.ThrowIfNull(update);
+
+        var updates = new List<UpdateDefinition<MongoUser>>();
+        if (update.Name is not null)
+        {
+            updates.Add(Builders<MongoUser>.Update.Set(user => user.Name, update.Name));
+        }
+
+        if (update.PasswordHash is not null)
+        {
+            updates.Add(Builders<MongoUser>.Update.Set(user => user.PasswordHash, update.PasswordHash));
+        }
+
+        if (update.MustChangePassword.HasValue)
+        {
+            updates.Add(Builders<MongoUser>.Update.Set(user => user.MustChangePassword, update.MustChangePassword.Value));
+        }
+
+        if (update.AssignedSiteIds is not null)
+        {
+            updates.Add(Builders<MongoUser>.Update.Set(user => user.AssignedSiteIds, update.AssignedSiteIds.ToList()));
+        }
+
+        return updates.Count == 0
+            ? false
+            : await UpdateUserAsyncInternal(userId, Builders<MongoUser>.Update.Combine(updates), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public Task<bool> UpdateUserRoleAsync(string userId, string role, CancellationToken cancellationToken) =>
-        UpdateUserAsync(userId, Builders<MongoUser>.Update.Set(user => user.Role, role), cancellationToken);
+        UpdateUserAsyncInternal(userId, Builders<MongoUser>.Update.Set(user => user.Role, role), cancellationToken);
 
     /// <inheritdoc />
     public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
@@ -229,18 +181,10 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     }
 
     /// <inheritdoc />
-    public async Task<bool> UpdateSiteAsync(string siteId, UpdateDefinition<MongoSite> update, CancellationToken cancellationToken)
-    {
-        update = Builders<MongoSite>.Update.Combine(update, Builders<MongoSite>.Update.Set(site => site.UpdatedAt, DateTime.UtcNow));
-        var result = await Sites.UpdateOneAsync(site => site.SiteId == siteId, update, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return result.ModifiedCount > 0;
-    }
-
-    /// <inheritdoc />
     public Task<bool> SaveSiteConfigAsync(string siteId, SiteConfig config, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return UpdateSiteAsync(siteId, Builders<MongoSite>.Update.Set(site => site.Config, SiteConfigDocumentSerializer.Write(config)), cancellationToken);
+        return UpdateSiteAsyncInternal(siteId, Builders<MongoSite>.Update.Set(site => site.Config, SiteConfigDocumentSerializer.Write(config)), cancellationToken);
     }
 
     /// <inheritdoc />
@@ -473,8 +417,22 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<BsonDocument>> ListPagesAsync(CancellationToken cancellationToken) =>
-        await Pages.Find(FilterDefinition<BsonDocument>.Empty).Sort(Builders<BsonDocument>.Sort.Descending("last_crawled")).Limit(1000).ToListAsync(cancellationToken).ConfigureAwait(false);
+    public async Task<IReadOnlyList<IndexedPageSummary>> ListPagesAsync(CancellationToken cancellationToken)
+    {
+        var pages = await Pages.Find(FilterDefinition<BsonDocument>.Empty)
+            .Sort(Builders<BsonDocument>.Sort.Descending("last_crawled"))
+            .Limit(1000)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return pages.Select(page => new IndexedPageSummary(
+                page.GetValue("url", string.Empty).AsString,
+                page.GetValue("title", string.Empty).AsString,
+                page.GetValue("chunk_count", 0).ToInt32(),
+                page.GetValue("last_crawled", BsonNull.Value).IsValidDateTime ? page["last_crawled"].ToUniversalTime() : (DateTime?)null,
+                page.GetValue("status", string.Empty).AsString))
+            .ToList();
+    }
 
     /// <inheritdoc />
     public async Task<bool> DeletePageAsync(string url, CancellationToken cancellationToken)
@@ -493,7 +451,7 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     }
 
     /// <inheritdoc />
-    public async Task<BsonDocument?> GetPlatformWhiteLabelAsync(CancellationToken cancellationToken)
+    private async Task<BsonDocument?> GetPlatformWhiteLabelDocumentAsync(CancellationToken cancellationToken)
     {
         var config = await PlatformSettings.Find(Builders<BsonDocument>.Filter.Eq("type", "whitelabel")).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         config?.Remove("_id");
@@ -502,7 +460,7 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     }
 
     /// <inheritdoc />
-    public async Task<BsonDocument> UpdatePlatformWhiteLabelAsync(BsonDocument config, CancellationToken cancellationToken)
+    private async Task<BsonDocument> UpdatePlatformWhiteLabelDocumentAsync(BsonDocument config, CancellationToken cancellationToken)
     {
         config["type"] = "whitelabel";
         config["updated_at"] = DateTime.UtcNow;
@@ -519,7 +477,7 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     /// <inheritdoc />
     public async Task<PlatformWhiteLabelConfig?> GetPlatformWhiteLabelConfigAsync(CancellationToken cancellationToken)
     {
-        var config = await GetPlatformWhiteLabelAsync(cancellationToken).ConfigureAwait(false);
+        var config = await GetPlatformWhiteLabelDocumentAsync(cancellationToken).ConfigureAwait(false);
         return config is null
             ? null
             : JsonSerializer.Deserialize<PlatformWhiteLabelConfig>(config.ToJson(), JsonSerializerOptions);
@@ -530,8 +488,22 @@ public sealed class MongoSiteChatRepository(IOptions<SiteChatOptions> options, I
     {
         ArgumentNullException.ThrowIfNull(config);
         var document = BsonDocument.Parse(JsonSerializer.Serialize(config, JsonSerializerOptions));
-        var updated = await UpdatePlatformWhiteLabelAsync(document, cancellationToken).ConfigureAwait(false);
+        var updated = await UpdatePlatformWhiteLabelDocumentAsync(document, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Deserialize<PlatformWhiteLabelConfig>(updated.ToJson(), JsonSerializerOptions) ?? new PlatformWhiteLabelConfig();
+    }
+
+    private async Task<bool> UpdateUserAsyncInternal(string userId, UpdateDefinition<MongoUser> update, CancellationToken cancellationToken)
+    {
+        update = Builders<MongoUser>.Update.Combine(update, Builders<MongoUser>.Update.Set(user => user.UpdatedAt, DateTime.UtcNow));
+        var result = await Users.UpdateOneAsync(UserIdFilter(userId), update, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    private async Task<bool> UpdateSiteAsyncInternal(string siteId, UpdateDefinition<MongoSite> update, CancellationToken cancellationToken)
+    {
+        update = Builders<MongoSite>.Update.Combine(update, Builders<MongoSite>.Update.Set(site => site.UpdatedAt, DateTime.UtcNow));
+        var result = await Sites.UpdateOneAsync(site => site.SiteId == siteId, update, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return result.ModifiedCount > 0;
     }
 
     private static FilterDefinition<MongoUser> UserIdFilter(string userId)

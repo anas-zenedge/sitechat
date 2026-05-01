@@ -3,9 +3,9 @@ namespace SiteChat.Backend.Api.Services;
 /// <summary>
 /// Initializes backend providers during application startup.
 /// </summary>
-public sealed class StartupHostedService(IMongoSiteChatRepository repository, IServiceProvider serviceProvider, ILogger<StartupHostedService> logger) : IHostedService
+public sealed class StartupHostedService(IMongoInfrastructureRepository repository, IServiceProvider serviceProvider, ILogger<StartupHostedService> logger) : IHostedService
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IMongoInfrastructureRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<StartupHostedService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 

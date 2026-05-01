@@ -18,8 +18,10 @@ public sealed class ConversationAccessServiceTests
     public async Task GetConversationAsync_InaccessibleSite_ReturnsNull()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
-        var service = new ConversationAccessService(repository.Object, new SiteAccessService());
+        var conversationRepository = new Mock<IConversationRepository>(MockBehavior.Strict);
+        var siteRepository = new Mock<ISiteRepository>(MockBehavior.Strict);
+        var systemRepository = new Mock<ISystemRepository>(MockBehavior.Strict);
+        var service = new ConversationAccessService(conversationRepository.Object, siteRepository.Object, systemRepository.Object, new SiteAccessService());
         var user = new MongoUser
         {
             UserId = "owner-1",
@@ -27,13 +29,13 @@ public sealed class ConversationAccessServiceTests
             AssignedSiteIds = []
         };
 
-        repository.Setup(item => item.GetConversationAsync("session-1", It.IsAny<CancellationToken>()))
+        conversationRepository.Setup(item => item.GetConversationAsync("session-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoConversation
             {
                 SessionId = "session-1",
                 SiteId = "site-1"
             });
-        repository.Setup(item => item.GetSiteAsync("site-1", It.IsAny<CancellationToken>()))
+        siteRepository.Setup(item => item.GetSiteAsync("site-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoSite
             {
                 SiteId = "site-1",
@@ -45,7 +47,8 @@ public sealed class ConversationAccessServiceTests
 
         // Assert
         conversation.Should().BeNull();
-        repository.VerifyAll();
+        conversationRepository.VerifyAll();
+        siteRepository.VerifyAll();
     }
 
     /// <summary>
@@ -55,20 +58,22 @@ public sealed class ConversationAccessServiceTests
     public async Task ListConversationsAsync_SiteOwnerWithoutFilter_UsesOwnedSites()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
-        var service = new ConversationAccessService(repository.Object, new SiteAccessService());
+        var conversationRepository = new Mock<IConversationRepository>(MockBehavior.Strict);
+        var siteRepository = new Mock<ISiteRepository>(MockBehavior.Strict);
+        var systemRepository = new Mock<ISystemRepository>(MockBehavior.Strict);
+        var service = new ConversationAccessService(conversationRepository.Object, siteRepository.Object, systemRepository.Object, new SiteAccessService());
         var user = new MongoUser
         {
             UserId = "owner-1",
             Role = "user"
         };
 
-        repository.Setup(item => item.ListSitesAsync("owner-1", null, It.IsAny<CancellationToken>()))
+        siteRepository.Setup(item => item.ListSitesAsync("owner-1", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new MongoSite { SiteId = "site-1", UserId = "owner-1" },
                 new MongoSite { SiteId = "site-2", UserId = "owner-1" }
             ]);
-        repository.Setup(item => item.ListConversationsForSitesAsync(
+        conversationRepository.Setup(item => item.ListConversationsForSitesAsync(
                 It.Is<IReadOnlyList<string>>(siteIds => siteIds.SequenceEqual(new[] { "site-1", "site-2" })),
                 null,
                 1,
@@ -84,7 +89,8 @@ public sealed class ConversationAccessServiceTests
         // Assert
         result.Total.Should().Be(1);
         result.Items.Should().ContainSingle(item => item.SessionId == "session-1");
-        repository.VerifyAll();
+        siteRepository.VerifyAll();
+        conversationRepository.VerifyAll();
     }
 
     /// <summary>
@@ -94,23 +100,25 @@ public sealed class ConversationAccessServiceTests
     public async Task DeleteConversationsAsync_MixedVisibility_DeletesOnlyAccessibleConversations()
     {
         // Arrange
-        var repository = new Mock<IMongoSiteChatRepository>(MockBehavior.Strict);
-        var service = new ConversationAccessService(repository.Object, new SiteAccessService());
+        var conversationRepository = new Mock<IConversationRepository>(MockBehavior.Strict);
+        var siteRepository = new Mock<ISiteRepository>(MockBehavior.Strict);
+        var systemRepository = new Mock<ISystemRepository>(MockBehavior.Strict);
+        var service = new ConversationAccessService(conversationRepository.Object, siteRepository.Object, systemRepository.Object, new SiteAccessService());
         var user = new MongoUser
         {
             UserId = "owner-1",
             Role = "user"
         };
 
-        repository.Setup(item => item.GetConversationAsync("allowed", It.IsAny<CancellationToken>()))
+        conversationRepository.Setup(item => item.GetConversationAsync("allowed", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoConversation { SessionId = "allowed", SiteId = "site-1" });
-        repository.Setup(item => item.GetSiteAsync("site-1", It.IsAny<CancellationToken>()))
+        siteRepository.Setup(item => item.GetSiteAsync("site-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoSite { SiteId = "site-1", UserId = "owner-1" });
-        repository.Setup(item => item.GetConversationAsync("blocked", It.IsAny<CancellationToken>()))
+        conversationRepository.Setup(item => item.GetConversationAsync("blocked", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoConversation { SessionId = "blocked", SiteId = "site-2" });
-        repository.Setup(item => item.GetSiteAsync("site-2", It.IsAny<CancellationToken>()))
+        siteRepository.Setup(item => item.GetSiteAsync("site-2", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MongoSite { SiteId = "site-2", UserId = "other-owner" });
-        repository.Setup(item => item.DeleteConversationsAsync(
+        conversationRepository.Setup(item => item.DeleteConversationsAsync(
                 It.Is<IReadOnlyList<string>>(sessionIds => sessionIds.SequenceEqual(new[] { "allowed" })),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -120,6 +128,7 @@ public sealed class ConversationAccessServiceTests
 
         // Assert
         deleted.Should().Be(1);
-        repository.VerifyAll();
+        conversationRepository.VerifyAll();
+        siteRepository.VerifyAll();
     }
 }

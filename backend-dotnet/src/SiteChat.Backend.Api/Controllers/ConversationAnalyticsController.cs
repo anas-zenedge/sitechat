@@ -13,10 +13,10 @@ namespace SiteChat.Backend.Api.Controllers;
 [Authorize]
 [Route("api/conversations")]
 public sealed class ConversationsController(
-    IMongoSiteChatRepository repository,
+    IUserRepository repository,
     IConversationAccessService conversationAccessService) : SiteChatControllerBase
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     private readonly IConversationAccessService _conversationAccessService = conversationAccessService ?? throw new ArgumentNullException(nameof(conversationAccessService));
 
     /// <summary>Lists conversations.</summary>
@@ -165,10 +165,10 @@ public sealed class ConversationsController(
 [Authorize]
 [Route("api/analytics")]
 public sealed class AnalyticsController(
-    IMongoSiteChatRepository repository,
+    IUserRepository repository,
     IConversationAccessService conversationAccessService) : SiteChatControllerBase
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     private readonly IConversationAccessService _conversationAccessService = conversationAccessService ?? throw new ArgumentNullException(nameof(conversationAccessService));
 
     /// <summary>Gets analytics overview.</summary>

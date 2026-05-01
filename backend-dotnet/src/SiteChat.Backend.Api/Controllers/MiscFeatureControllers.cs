@@ -12,10 +12,12 @@ namespace SiteChat.Backend.Api.Controllers;
 [ApiController]
 [Route("api/embed")]
 public sealed class EmbedController(
-    IMongoSiteChatRepository repository,
+    IUserRepository userRepository,
+    ISiteRepository siteRepository,
     ISiteManagementService siteManagementService) : SiteChatControllerBase
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IUserRepository _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+    private readonly ISiteRepository _siteRepository = siteRepository ?? throw new ArgumentNullException(nameof(siteRepository));
     private readonly ISiteManagementService _siteManagementService = siteManagementService ?? throw new ArgumentNullException(nameof(siteManagementService));
 
     /// <summary>Creates a site for widget embedding.</summary>
@@ -23,7 +25,7 @@ public sealed class EmbedController(
     [Authorize(Policy = AuthorizationPolicies.AdminOrUser)]
     public async Task<ActionResult<SetupResponse>> SetupAsync([FromBody] SetupRequest request, CancellationToken cancellationToken)
     {
-        var owner = await GetCurrentUserAsync(_repository, cancellationToken).ConfigureAwait(false);
+        var owner = await GetCurrentUserAsync(_userRepository, cancellationToken).ConfigureAwait(false);
         if (UnauthorizedIfMissing(owner) is { } missing)
         {
             return missing;
@@ -40,7 +42,7 @@ public sealed class EmbedController(
     [AllowAnonymous]
     public async Task<ActionResult<object>> StatusAsync(string siteId, CancellationToken cancellationToken)
     {
-        var site = await _repository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
+        var site = await _siteRepository.GetSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
         return site is null ? NotFound(new { detail = "Site not found" }) : Ok(new { site_id = site.SiteId, status = site.Status });
     }
 

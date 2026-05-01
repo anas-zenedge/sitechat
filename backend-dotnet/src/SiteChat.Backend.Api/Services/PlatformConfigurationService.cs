@@ -33,9 +33,9 @@ public interface IPlatformConfigurationService
 /// <summary>
 /// Implements platform-wide white-label configuration behavior.
 /// </summary>
-public sealed class PlatformConfigurationService(IMongoSiteChatRepository repository) : IPlatformConfigurationService
+public sealed class PlatformConfigurationService(IPlatformConfigurationRepository repository) : IPlatformConfigurationService
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IPlatformConfigurationRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     /// <inheritdoc />
     public async Task<PlatformWhiteLabelConfig> GetAsync(CancellationToken cancellationToken) =>

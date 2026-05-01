@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
 using SiteChat.Backend.Api.Models;
 using SiteChat.Backend.Api.Services;
 
@@ -12,10 +11,14 @@ namespace SiteChat.Backend.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/crawl")]
-public sealed class CrawlController(ICrawlService crawlService, IMongoSiteChatRepository repository) : ControllerBase
+public sealed class CrawlController(
+    ICrawlService crawlService,
+    ICrawlJobRepository crawlJobRepository,
+    IPageRepository pageRepository) : ControllerBase
 {
     private readonly ICrawlService _crawlService = crawlService ?? throw new ArgumentNullException(nameof(crawlService));
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly ICrawlJobRepository _crawlJobRepository = crawlJobRepository ?? throw new ArgumentNullException(nameof(crawlJobRepository));
+    private readonly IPageRepository _pageRepository = pageRepository ?? throw new ArgumentNullException(nameof(pageRepository));
 
     /// <summary>Starts a crawl job.</summary>
     [HttpPost("")]
@@ -35,7 +38,7 @@ public sealed class CrawlController(ICrawlService crawlService, IMongoSiteChatRe
     [HttpGet("status/{jobId}")]
     public async Task<ActionResult<CrawlStatus>> StatusAsync(string jobId, CancellationToken cancellationToken)
     {
-        var job = await _repository.GetCrawlJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var job = await _crawlJobRepository.GetCrawlJobAsync(jobId, cancellationToken).ConfigureAwait(false);
         return job is null
             ? NotFound(new { detail = "Crawl job not found" })
             : Ok(new CrawlStatus(job.ObjectId.ToString(), job.Status, job.PagesCrawled, job.PagesIndexed, job.Errors, job.CreatedAt, job.Status == "completed" ? job.UpdatedAt : null));
@@ -45,7 +48,7 @@ public sealed class CrawlController(ICrawlService crawlService, IMongoSiteChatRe
     [HttpGet("latest")]
     public async Task<ActionResult<CrawlStatus>> LatestAsync(CancellationToken cancellationToken)
     {
-        var job = await _repository.GetLatestCrawlJobAsync(cancellationToken).ConfigureAwait(false);
+        var job = await _crawlJobRepository.GetLatestCrawlJobAsync(cancellationToken).ConfigureAwait(false);
         return job is null
             ? NotFound(new { detail = "No crawl jobs found" })
             : Ok(new CrawlStatus(job.ObjectId.ToString(), job.Status, job.PagesCrawled, job.PagesIndexed, job.Errors, job.CreatedAt, job.Status == "completed" ? job.UpdatedAt : null));
@@ -57,24 +60,14 @@ public sealed class CrawlController(ICrawlService crawlService, IMongoSiteChatRe
 
     /// <summary>Lists indexed pages.</summary>
     [HttpGet("pages")]
-    public async Task<ActionResult<IReadOnlyList<object>>> PagesAsync(CancellationToken cancellationToken)
-    {
-        var pages = await _repository.ListPagesAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(pages.Select(page => new
-        {
-            url = page.GetValue("url", string.Empty).AsString,
-            title = page.GetValue("title", string.Empty).AsString,
-            chunk_count = page.GetValue("chunk_count", 0).ToInt32(),
-            last_crawled = page.GetValue("last_crawled", BsonNull.Value).IsValidDateTime ? page["last_crawled"].ToUniversalTime() : (DateTime?)null,
-            status = page.GetValue("status", string.Empty).AsString
-        }).ToList());
-    }
+    public async Task<ActionResult<IReadOnlyList<IndexedPageSummary>>> PagesAsync(CancellationToken cancellationToken) =>
+        Ok(await _pageRepository.ListPagesAsync(cancellationToken).ConfigureAwait(false));
 
     /// <summary>Deletes an indexed page.</summary>
     [HttpDelete("pages/{*url}")]
     public async Task<ActionResult<object>> DeletePageAsync(string url, CancellationToken cancellationToken)
     {
-        var deleted = await _repository.DeletePageAsync(url, cancellationToken).ConfigureAwait(false);
+        var deleted = await _pageRepository.DeletePageAsync(url, cancellationToken).ConfigureAwait(false);
         return deleted ? Ok(new { success = true, message = $"Page {url} deleted" }) : NotFound(new { detail = "Page not found" });
     }
 }

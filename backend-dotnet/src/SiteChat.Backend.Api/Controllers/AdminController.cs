@@ -13,9 +13,14 @@ namespace SiteChat.Backend.Api.Controllers;
 [ApiController]
 [Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/admin")]
-public sealed class AdminController(IMongoSiteChatRepository repository, IAiProviderClient aiProviderClient, IOptions<SiteChatOptions> options) : ControllerBase
+public sealed class AdminController(
+    IMongoInfrastructureRepository infrastructureRepository,
+    ISystemRepository systemRepository,
+    IAiProviderClient aiProviderClient,
+    IOptions<SiteChatOptions> options) : ControllerBase
 {
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly IMongoInfrastructureRepository _infrastructureRepository = infrastructureRepository ?? throw new ArgumentNullException(nameof(infrastructureRepository));
+    private readonly ISystemRepository _systemRepository = systemRepository ?? throw new ArgumentNullException(nameof(systemRepository));
     private readonly IAiProviderClient _aiProviderClient = aiProviderClient ?? throw new ArgumentNullException(nameof(aiProviderClient));
     private readonly SiteChatOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
@@ -23,7 +28,7 @@ public sealed class AdminController(IMongoSiteChatRepository repository, IAiProv
     [HttpGet("health")]
     public async Task<ActionResult<HealthCheckResponse>> HealthAsync(CancellationToken cancellationToken)
     {
-        var mongoHealthy = await _repository.IsHealthyAsync(cancellationToken).ConfigureAwait(false);
+        var mongoHealthy = await _infrastructureRepository.IsHealthyAsync(cancellationToken).ConfigureAwait(false);
         var aiProviderHealthy = await _aiProviderClient.IsHealthyAsync(cancellationToken).ConfigureAwait(false);
         var status = mongoHealthy && aiProviderHealthy ? "healthy" : "degraded";
         return Ok(new HealthCheckResponse(
@@ -36,7 +41,7 @@ public sealed class AdminController(IMongoSiteChatRepository repository, IAiProv
     /// <summary>Gets aggregate system statistics.</summary>
     [HttpGet("stats")]
     public async Task<ActionResult<SystemStats>> StatsAsync(CancellationToken cancellationToken) =>
-        Ok(await _repository.GetSystemStatsAsync(cancellationToken).ConfigureAwait(false));
+        Ok(await _systemRepository.GetSystemStatsAsync(cancellationToken).ConfigureAwait(false));
 
     /// <summary>Gets non-sensitive runtime configuration.</summary>
     [HttpGet("config")]
@@ -58,7 +63,7 @@ public sealed class AdminController(IMongoSiteChatRepository repository, IAiProv
     [HttpDelete("clear-all")]
     public async Task<ActionResult<object>> ClearAllAsync(CancellationToken cancellationToken)
     {
-        await _repository.ClearOperationalDataAsync(cancellationToken).ConfigureAwait(false);
+        await _systemRepository.ClearOperationalDataAsync(cancellationToken).ConfigureAwait(false);
         return Ok(new { success = true, message = "All operational data cleared" });
     }
 }

@@ -18,13 +18,15 @@ public interface ICrawlService
 /// </summary>
 public sealed class CrawlService(
     ICrawlerUrlValidator urlValidator,
-    IMongoSiteChatRepository repository,
+    ICrawlJobRepository crawlJobRepository,
+    IPageRepository pageRepository,
     IAiProviderClient aiProviderClient,
     IHttpClientFactory httpClientFactory,
     ILogger<CrawlService> logger) : ICrawlService
 {
     private readonly ICrawlerUrlValidator _urlValidator = urlValidator ?? throw new ArgumentNullException(nameof(urlValidator));
-    private readonly IMongoSiteChatRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+    private readonly ICrawlJobRepository _crawlJobRepository = crawlJobRepository ?? throw new ArgumentNullException(nameof(crawlJobRepository));
+    private readonly IPageRepository _pageRepository = pageRepository ?? throw new ArgumentNullException(nameof(pageRepository));
     private readonly IAiProviderClient _aiProviderClient = aiProviderClient ?? throw new ArgumentNullException(nameof(aiProviderClient));
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     private readonly ILogger<CrawlService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -39,7 +41,7 @@ public sealed class CrawlService(
             throw new InvalidOperationException(validation.ErrorMessage);
         }
 
-        var job = await _repository.CreateCrawlJobAsync(validation.Uri.ToString(), cancellationToken).ConfigureAwait(false);
+        var job = await _crawlJobRepository.CreateCrawlJobAsync(validation.Uri.ToString(), cancellationToken).ConfigureAwait(false);
         try
         {
             var client = _httpClientFactory.CreateClient();
@@ -63,13 +65,13 @@ public sealed class CrawlService(
                 _logger.LogWarning(ex, "OpenRouter embeddings were not available during crawl for {Url}", validation.Uri);
             }
 
-            await _repository.SavePageAsync(validation.Uri.ToString(), title, text, Math.Max(1, text.Length / 1000), null, embedding, cancellationToken).ConfigureAwait(false);
-            await _repository.UpdateCrawlJobAsync(job.ObjectId.ToString(), "completed", 1, 1, null, cancellationToken).ConfigureAwait(false);
+            await _pageRepository.SavePageAsync(validation.Uri.ToString(), title, text, Math.Max(1, text.Length / 1000), null, embedding, cancellationToken).ConfigureAwait(false);
+            await _crawlJobRepository.UpdateCrawlJobAsync(job.ObjectId.ToString(), "completed", 1, 1, null, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Crawl failed for {Url}", validation.Uri);
-            await _repository.UpdateCrawlJobAsync(job.ObjectId.ToString(), "failed", 0, 0, "Crawl failed", cancellationToken).ConfigureAwait(false);
+            await _crawlJobRepository.UpdateCrawlJobAsync(job.ObjectId.ToString(), "failed", 0, 0, "Crawl failed", cancellationToken).ConfigureAwait(false);
         }
 
         return new CrawlResponse(job.ObjectId.ToString(), "Crawl job started", "running");
